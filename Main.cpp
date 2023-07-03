@@ -1,7 +1,59 @@
 #include <Windows.h>
 
+#define file_local static // static function
+#define local_persist static // static variable
+#define global_variable static
+
+// global variable
+global_variable bool running; // false by default
+global_variable BITMAPINFO BitmapInfo; // structure that defines the dimensions and color information for a Windows device-independent bitmap (DIB), clear to 0 by default
+global_variable void *BitmapMemory; // pointer to the bitmap bits
+global_variable HBITMAP BitmapHandle; // handle to the bitmap
+global_variable HDC BitmapDeviceContext; // handle to the device context associated with the bitmap
+
+/** DIB (Device Independent Bitmap) Section */
+file_local void 
+Win32ResizeDIBSection(int Width, int Height)
+{   
+    if(BitmapHandle)
+    {
+        DeleteObject(BitmapHandle); // deletes a logical pen, brush, font, bitmap, region, or palette, freeing all system resources associated with the object
+    }
+    if(!BitmapDeviceContext){
+        BitmapDeviceContext = CreateCompatibleDC(0); // retrieves a handle to a device context (DC) for the client area of a specified window or for the entire screen
+    }
+
+    BitmapInfo.bmiHeader.biSize = sizeof(BitmapInfo.bmiHeader); // size, in bytes, of the structure 
+    BitmapInfo.bmiHeader.biWidth = Width; // width, in pixels, of the DIB
+    BitmapInfo.bmiHeader.biHeight = Height; // height, in pixels, of the DIB
+    BitmapInfo.bmiHeader.biPlanes = 1; // number of planes for the target device must be set to 1
+    BitmapInfo.bmiHeader.biBitCount = 32; // number of bits-per-pixel
+    BitmapInfo.bmiHeader.biCompression = BI_RGB; // uncompressed format
+
+    BitmapHandle = CreateDIBSection(
+        BitmapDeviceContext,
+        &BitmapInfo,
+        DIB_RGB_COLORS,
+        &BitmapMemory,
+        0,0);
+
+}
+
+file_local void
+Win32UpdateWindow(HDC DeviceContext, int X, int Y, int Width, int Height)
+{
+    StretchDIBits(DeviceContext, // handle to the device context
+                  X, Y, Width, Height, // destination rectangle
+                  X, Y, Width, Height, // source rectangle
+                  BitmapMemory,
+                  &BitmapInfo,  // source rectangle
+                  DIB_RGB_COLORS, // color data
+                  SRCCOPY); // raster operation code
+
+}
+
 LRESULT CALLBACK 
-MainWindowCallback(HWND Window,   // handle to the window
+Win32MainWindowCallback(HWND Window,   // handle to the window
                    UINT Message,  // message identifier
                    WPARAM wParam, // additional message information
                    LPARAM lParam) // additional message information
@@ -11,18 +63,16 @@ MainWindowCallback(HWND Window,   // handle to the window
     {
         case WM_SIZE: // sent to a window after its size has changed
         {
-            OutputDebugStringA("WM_SIZE\n");
-        }break;
-
-        case WM_DESTROY: // sent when a window is being destroyed
-        {
-            OutputDebugStringA("WM_DESTROY\n");
+            RECT ClientRect; // structure that defines the coordinates of the upper-left and lower-right corners of a rectangle
+            GetClientRect(Window, &ClientRect); // retrieves the coordinates of a window's client area
+            int Width = ClientRect.right - ClientRect.left; // width of the rectangle
+            int Height = ClientRect.bottom - ClientRect.top; // height of the rectangle
+            Win32ResizeDIBSection(Width, Height);
         }break;
         
         case WM_CLOSE: // sent as a signal that a window or an application should terminate
         {
-            DestroyWindow(Window); // Close the window
-            OutputDebugStringA("WM_CLOSE\n");
+            running = false;
         }break;
 
         case WM_ACTIVATEAPP: // sent when a window belonging to a different application than the active window is about to be activated    
@@ -30,19 +80,22 @@ MainWindowCallback(HWND Window,   // handle to the window
             OutputDebugStringA("WM_ACTIVATEAPP\n");
         }break;
 
+        case WM_DESTROY: // sent when a window is being destroyed
+        {
+            running = false;
+        }break;
+
         case WM_PAINT:   
         {
             PAINTSTRUCT Paint; // structure that contains information for an application. This information can be used to paint the client area of a window owned by that application
             HDC DeviceContext = BeginPaint(Window, &Paint); // prepares the specified window for painting and fills a PAINTSTRUCT structure with information about the painting
+            
+            int X = Paint.rcPaint.left;
+            int Y = Paint.rcPaint.top;
+            int Height = Paint.rcPaint.bottom - Paint.rcPaint.top;
+            int Width = Paint.rcPaint.right - Paint.rcPaint.left;
 
-    // function that performs a bit-block transfer of the color data corresponding to a rectangle of pixels from the specified source device context into a destination device context
-
-            PatBlt(DeviceContext,
-                   Paint.rcPaint.left,
-                   Paint.rcPaint.top,
-                   Paint.rcPaint.right - Paint.rcPaint.left, // width
-                   Paint.rcPaint.bottom - Paint.rcPaint.top, // height
-                   BLACKNESS); 
+            Win32UpdateWindow(DeviceContext,X, Y, Width, Height);
 
             EndPaint(Window, &Paint); // marks the end of painting in the specified window. This function is required for each call to the BeginPaint function, but only after painting is complete
             
@@ -50,7 +103,6 @@ MainWindowCallback(HWND Window,   // handle to the window
 
         default:
         {
-            OutputDebugStringA("default\n");
             Result = DefWindowProc(Window, Message, wParam, lParam); // calls the default window procedure to provide default processing for any window messages that an application does not process
         }break;
     }
@@ -89,9 +141,9 @@ WinMain (HINSTANCE hInstance, // the base address of the executable, primary use
     WindowClass.style = CS_OWNDC   | //allocates a unique device context for each window in the class
                         CS_HREDRAW | // redraws the entire window if a movement or size adjustment changes the width of the client area
                         CS_VREDRAW; // redraws the entire window if a movement or size adjustment changes the height of the client area
-    WindowClass.lpfnWndProc = MainWindowCallback ;   // pointer to the window procedure 
+    WindowClass.lpfnWndProc = Win32MainWindowCallback ;   // pointer to the window procedure 
     WindowClass.hInstance =  hInstance;
-    WindowClass.lpszClassName = "TestWindowClass";
+    WindowClass.lpszClassName = (LPCSTR)"TestWindowClass";
 
 
 // registers a window class for subsequent use in calls to the CreateWindow or CreateWindowEx function
@@ -101,7 +153,7 @@ WinMain (HINSTANCE hInstance, // the base address of the executable, primary use
                 CreateWindowEx(
                     0,                                // extended window style
                     WindowClass.lpszClassName,        // pointer to a null-terminated string or is an atom
-                    "Test Window",                    // pointer to a null-terminated string that specifies the window name
+                    (LPCSTR)"Test Window",                    // pointer to a null-terminated string that specifies the window name
                     WS_OVERLAPPEDWINDOW | WS_VISIBLE, // window style
                     CW_USEDEFAULT,                    // initial horizontal position of the window
                     CW_USEDEFAULT,                    // initial vertical position of the window
@@ -113,8 +165,10 @@ WinMain (HINSTANCE hInstance, // the base address of the executable, primary use
                     0);                               // pointer to a value to be passed to the window through the CREATESTRUCT structure (lpCreateParams member) pointed to by the lParam param of the WM_CREATE message
             if (WindowHandle)  // if the window was created successfully
             {
+            /* Message Loop */
+                running = true;
                 MSG Message; // structure that contains message information from a thread's message queue
-                for(;;)
+                while(running)
                 {
                     BOOL MessageResult = GetMessage(&Message,0, 0, 0);
                     if (MessageResult > 0)
@@ -126,17 +180,14 @@ WinMain (HINSTANCE hInstance, // the base address of the executable, primary use
                     {
                         break;
                     }
-
                 }       
-                
             }
             else
             {
 
             }
-
-            return (0);
-    }else
+    }
+    else
     {
 
     }
