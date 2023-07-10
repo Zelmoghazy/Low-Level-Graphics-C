@@ -1,54 +1,98 @@
 #include <Windows.h>
+#include <stdint.h>
 
 #define file_local static // static function
 #define local_persist static // static variable
 #define global_variable static
 
-// global variable
+/* global variables */
 global_variable bool running; // false by default
-global_variable BITMAPINFO BitmapInfo; // structure that defines the dimensions and color information for a Windows device-independent bitmap (DIB), clear to 0 by default
+ // structure that defines the dimensions and color information for a Windows device-independent bitmap (DIB), clear to 0 by default
+global_variable BITMAPINFO BitmapInfo;
 global_variable void *BitmapMemory; // pointer to the bitmap bits
-global_variable HBITMAP BitmapHandle; // handle to the bitmap
-global_variable HDC BitmapDeviceContext; // handle to the device context associated with the bitmap
+global_variable int BitmapWidth ;
+global_variable int BitmapHeight ;
+global_variable int BytesPerPixel = 4; // 4 bytes per pixel
+
+
+file_local void
+RenderGradient(int XOffset, int YOffset)
+{
+    int Width = BitmapWidth;
+    int Height = BitmapHeight;
+    int Pitch = Width*BytesPerPixel; // number of bytes in one scan line of the bitmap
+    uint8_t *Row = (uint8_t *)BitmapMemory; // pointer to the first row of the bitmap
+    for(int Y = 0; Y < BitmapHeight; ++Y)
+    {
+        uint8_t *Pixel = (uint8_t *)Row; // pointer to the first pixel of the row
+        for(int X = 0; X < BitmapWidth; ++X)
+        {
+            /*
+                Pixel in memory: 0x xx RR GG BB 
+                little endian:   0x BB GG RR xx
+             */
+
+            /* BLUE */
+            *Pixel = (uint8_t)(X+XOffset);
+            ++Pixel; // moves the pointer to the next pixel
+
+            /* GREEN */
+            *Pixel =  (uint8_t)(Y+YOffset);
+            ++Pixel;
+
+            /* RED */
+            *Pixel = 0;
+            ++Pixel;
+            
+            *Pixel = 0;
+            ++Pixel;
+
+        }
+        Row += Pitch; // moves the pointer to the next row
+    }
+}
+
 
 /** DIB (Device Independent Bitmap) Section */
 file_local void 
 Win32ResizeDIBSection(int Width, int Height)
-{   
-    if(BitmapHandle)
+{  
+    if (BitmapMemory)
     {
-        DeleteObject(BitmapHandle); // deletes a logical pen, brush, font, bitmap, region, or palette, freeing all system resources associated with the object
-    }
-    if(!BitmapDeviceContext){
-        BitmapDeviceContext = CreateCompatibleDC(0); // retrieves a handle to a device context (DC) for the client area of a specified window or for the entire screen
-    }
+        VirtualFree(BitmapMemory, 0, MEM_RELEASE); // releases, decommits, or releases and decommits a region of pages within the virtual address space of the calling process
+    } 
+    BitmapWidth = Width;
+    BitmapHeight = Height;
 
     BitmapInfo.bmiHeader.biSize = sizeof(BitmapInfo.bmiHeader); // size, in bytes, of the structure 
-    BitmapInfo.bmiHeader.biWidth = Width; // width, in pixels, of the DIB
-    BitmapInfo.bmiHeader.biHeight = Height; // height, in pixels, of the DIB
-    BitmapInfo.bmiHeader.biPlanes = 1; // number of planes for the target device must be set to 1
-    BitmapInfo.bmiHeader.biBitCount = 32; // number of bits-per-pixel
-    BitmapInfo.bmiHeader.biCompression = BI_RGB; // uncompressed format
+    BitmapInfo.bmiHeader.biWidth = BitmapWidth;                 // width, in pixels, of the DIB
+    BitmapInfo.bmiHeader.biHeight = -BitmapHeight;              // height, in pixels, of the DIB (negative indicates a top-down DIB)
+    BitmapInfo.bmiHeader.biPlanes = 1;                          // number of planes for the target device must be set to 1
+    BitmapInfo.bmiHeader.biBitCount = 32;                       // number of bits-per-pixel
+    BitmapInfo.bmiHeader.biCompression = BI_RGB;                // uncompressed format
 
-    BitmapHandle = CreateDIBSection(
-        BitmapDeviceContext,
-        &BitmapInfo,
-        DIB_RGB_COLORS,
-        &BitmapMemory,
-        0,0);
-
+    int BitmapMemorySize = (BitmapWidth*BitmapHeight)*BytesPerPixel; // size of the bitmap buffer in bytes
+    BitmapMemory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE); // reserves or commits a region of pages in the virtual address space of the calling process
+    RenderGradient(0,0);
 }
 
 file_local void
-Win32UpdateWindow(HDC DeviceContext, int X, int Y, int Width, int Height)
+Win32UpdateWindow(HDC DeviceContext,RECT *WindowRect, int X, int Y, int Width, int Height)
 {
+    int WindowWidth = WindowRect->right - WindowRect->left;
+    int WindowHeight = WindowRect->bottom - WindowRect->top;
+
     StretchDIBits(DeviceContext, // handle to the device context
+                 /* 
                   X, Y, Width, Height, // destination rectangle
-                  X, Y, Width, Height, // source rectangle
+                  X, Y, Width, Height, // source rectangle 
+                  */
+                  0, 0, BitmapWidth, BitmapHeight, // destination rectangle
+                  0, 0, WindowWidth, WindowHeight, // source rectangle
                   BitmapMemory,
-                  &BitmapInfo,  // source rectangle
-                  DIB_RGB_COLORS, // color data
-                  SRCCOPY); // raster operation code
+                  &BitmapInfo,     // source rectangle
+                  DIB_RGB_COLORS,  // color data
+                  SRCCOPY);        // raster operation code
 
 }
 
@@ -95,7 +139,10 @@ Win32MainWindowCallback(HWND Window,   // handle to the window
             int Height = Paint.rcPaint.bottom - Paint.rcPaint.top;
             int Width = Paint.rcPaint.right - Paint.rcPaint.left;
 
-            Win32UpdateWindow(DeviceContext,X, Y, Width, Height);
+            RECT ClientRect; // structure that defines the coordinates of the upper-left and lower-right corners of a rectangle
+            GetClientRect(Window, &ClientRect); // retrieves the coordinates of a window's client area
+
+            Win32UpdateWindow(DeviceContext, &ClientRect,X, Y, Width, Height);
 
             EndPaint(Window, &Paint); // marks the end of painting in the specified window. This function is required for each call to the BeginPaint function, but only after painting is complete
             
