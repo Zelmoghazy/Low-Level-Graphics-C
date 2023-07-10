@@ -24,7 +24,7 @@ RenderGradient(int XOffset, int YOffset)
     uint8_t *Row = (uint8_t *)BitmapMemory; // pointer to the first row of the bitmap
     for(int Y = 0; Y < BitmapHeight; ++Y)
     {
-        uint8_t *Pixel = (uint8_t *)Row; // pointer to the first pixel of the row
+        uint32_t *Pixel = (uint32_t *)Row; // pointer to the first pixel of the row
         for(int X = 0; X < BitmapWidth; ++X)
         {
             /*
@@ -32,21 +32,10 @@ RenderGradient(int XOffset, int YOffset)
                 little endian:   0x BB GG RR xx
              */
 
-            /* BLUE */
-            *Pixel = (uint8_t)(X+XOffset);
-            ++Pixel; // moves the pointer to the next pixel
+            uint8_t Blue = (X + XOffset);
+            uint8_t Green = (Y + YOffset);
 
-            /* GREEN */
-            *Pixel =  (uint8_t)(Y+YOffset);
-            ++Pixel;
-
-            /* RED */
-            *Pixel = 0;
-            ++Pixel;
-            
-            *Pixel = 0;
-            ++Pixel;
-
+            *Pixel++ = ((Green << 8) | Blue);
         }
         Row += Pitch; // moves the pointer to the next row
     }
@@ -73,14 +62,13 @@ Win32ResizeDIBSection(int Width, int Height)
 
     int BitmapMemorySize = (BitmapWidth*BitmapHeight)*BytesPerPixel; // size of the bitmap buffer in bytes
     BitmapMemory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE); // reserves or commits a region of pages in the virtual address space of the calling process
-    RenderGradient(0,0);
 }
 
 file_local void
-Win32UpdateWindow(HDC DeviceContext,RECT *WindowRect, int X, int Y, int Width, int Height)
+Win32UpdateWindow(HDC DeviceContext,RECT *ClientRect, int X, int Y, int Width, int Height)
 {
-    int WindowWidth = WindowRect->right - WindowRect->left;
-    int WindowHeight = WindowRect->bottom - WindowRect->top;
+    int WindowWidth = ClientRect->right - ClientRect->left;
+    int WindowHeight = ClientRect->bottom - ClientRect->top;
 
     StretchDIBits(DeviceContext, // handle to the device context
                  /* 
@@ -196,7 +184,7 @@ WinMain (HINSTANCE hInstance, // the base address of the executable, primary use
 // registers a window class for subsequent use in calls to the CreateWindow or CreateWindowEx function
     if (RegisterClass(&WindowClass))
     { 
-            HWND WindowHandle =
+            HWND Window =
                 CreateWindowEx(
                     0,                                // extended window style
                     WindowClass.lpszClassName,        // pointer to a null-terminated string or is an atom
@@ -210,23 +198,34 @@ WinMain (HINSTANCE hInstance, // the base address of the executable, primary use
                     0,                                // handle to a menu, or specifies a child-window identifier depending on the window style
                     hInstance,                        // handle to the instance of the module to be associated with the window
                     0);                               // pointer to a value to be passed to the window through the CREATESTRUCT structure (lpCreateParams member) pointed to by the lParam param of the WM_CREATE message
-            if (WindowHandle)  // if the window was created successfully
+            if (Window)  // if the window was created successfully
             {
             /* Message Loop */
+                int XOfsset = 0;
+                int YOfsset = 0;
                 running = true;
-                MSG Message; // structure that contains message information from a thread's message queue
                 while(running)
                 {
-                    BOOL MessageResult = GetMessage(&Message,0, 0, 0);
-                    if (MessageResult > 0)
+                    MSG Message; // structure that contains message information from a thread's message queue
+                    while (PeekMessage(&Message,0, 0, 0, PM_REMOVE))
                     {
+                        if(Message.message == WM_QUIT)
+                        {
+                            running = false;
+                        }
                         TranslateMessage(&Message); // translates virtual-key messages into character messages
                         DispatchMessage(&Message); // dispatches a message to a window procedure
                     }
-                    else
-                    {
-                        break;
-                    }
+                    RenderGradient(XOfsset++, YOfsset++);
+
+                    HDC DeviceContext = GetDC(Window); 
+                    RECT ClientRect;
+                    GetClientRect(Window, &ClientRect);
+                    int WindowWidth = ClientRect.right - ClientRect.left;
+                    int WindowHeight = ClientRect.bottom - ClientRect.top;
+
+                    Win32UpdateWindow(DeviceContext, &ClientRect,0,0,WindowWidth, WindowHeight);
+                    ReleaseDC(Window, DeviceContext);
                 }       
             }
             else
