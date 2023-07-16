@@ -9,7 +9,7 @@
 global_variable bool running; // false by default
  // structure that defines the dimensions and color information for a Windows device-independent bitmap (DIB), clear to 0 by default
 global_variable BITMAPINFO BitmapInfo;
-global_variable void *BitmapMemory; // pointer to the bitmap bits
+global_variable void *BitmapMemory;    // pointer to the bitmap bits
 global_variable int BitmapWidth ;
 global_variable int BitmapHeight ;
 global_variable int BytesPerPixel = 4; // 4 bytes per pixel
@@ -20,11 +20,11 @@ RenderGradient(int XOffset, int YOffset)
 {
     int Width = BitmapWidth;
     int Height = BitmapHeight;
-    int Pitch = Width*BytesPerPixel; // number of bytes in one scan line of the bitmap
+    int Pitch = Width*BytesPerPixel;        // number of bytes in one scan line of the bitmap
     uint8_t *Row = (uint8_t *)BitmapMemory; // pointer to the first row of the bitmap
     for(int Y = 0; Y < BitmapHeight; ++Y)
     {
-        uint32_t *Pixel = (uint32_t *)Row; // pointer to the first pixel of the row
+        uint32_t *Pixel = (uint32_t *)Row;  // pointer to the first pixel of the row
         for(int X = 0; X < BitmapWidth; ++X)
         {
             /*
@@ -115,6 +115,11 @@ Win32MainWindowCallback(HWND Window,   // handle to the window
         case WM_DESTROY: // sent when a window is being destroyed
         {
             running = false;
+        }break;
+
+        case WM_SETCURSOR: // sent when a window is being destroyed
+        {
+            SetCursor(LoadCursor(0, IDC_ARROW)); // sets the cursor shape
         }break;
 
         case WM_PAINT:   
