@@ -2,34 +2,43 @@
 #include <SDL2/SDL_image.h>
 #include <stdio.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #define SCREEN_WIDTH 1280 
 #define SCREEN_HEIGHT 720
 
-#define COLOR_RED (SDL_Color){255, 0, 0, 255}
-#define COLOR_GREEN (SDL_Color){0, 255, 0, 255}
-#define COLOR_BLUE (SDL_Color){0, 0, 255, 255}
-#define COLOR_WHITE (SDL_Color){255, 255, 255, 255}
-#define COLOR_BLACK (SDL_Color){0, 0, 0, 255}
-#define COLOR_YELLOW (SDL_Color){255, 255, 0, 255}
-#define COLOR_CYAN (SDL_Color){0, 255, 255, 255}
-#define COLOR_MAGENTA (SDL_Color){255, 0, 255, 255}
-#define COLOR_ORANGE (SDL_Color){255, 165, 0, 255}
-#define COLOR_PURPLE (SDL_Color){128, 0, 128, 255}
-#define COLOR_PINK (SDL_Color){255, 192, 203, 255}
-#define COLOR_GRAY (SDL_Color){128, 128, 128, 255}
+#define COLOR_RED        (SDL_Color){255, 0, 0, 255}
+#define COLOR_GREEN      (SDL_Color){0, 255, 0, 255}
+#define COLOR_BLUE       (SDL_Color){0, 0, 255, 255}
+#define COLOR_WHITE      (SDL_Color){255, 255, 255, 255}
+#define COLOR_BLACK      (SDL_Color){0, 0, 0, 255}
+#define COLOR_YELLOW     (SDL_Color){255, 255, 0, 255}
+#define COLOR_CYAN       (SDL_Color){0, 255, 255, 255}
+#define COLOR_MAGENTA    (SDL_Color){255, 0, 255, 255}
+#define COLOR_ORANGE     (SDL_Color){255, 165, 0, 255}
+#define COLOR_PURPLE     (SDL_Color){128, 0, 128, 255}
+#define COLOR_PINK       (SDL_Color){255, 192, 203, 255}
+#define COLOR_GRAY       (SDL_Color){128, 128, 128, 255}
 #define COLOR_LIGHT_GRAY (SDL_Color){211, 211, 211, 255}
-#define COLOR_DARK_GRAY (SDL_Color){169, 169, 169, 255}
-#define COLOR_BROWN (SDL_Color){139, 69, 19, 255}
-#define COLOR_NAVY (SDL_Color){0, 0, 128, 255}
-#define COLOR_LIME (SDL_Color){0, 255, 0, 255}
-#define COLOR_TEAL (SDL_Color){0, 128, 128, 255}
-#define COLOR_MAROON (SDL_Color){128, 0, 0, 255}
-#define COLOR_OLIVE (SDL_Color){128, 128, 0, 255}
-
+#define COLOR_DARK_GRAY  (SDL_Color){169, 169, 169, 255}
+#define COLOR_BROWN      (SDL_Color){139, 69, 19, 255}
+#define COLOR_NAVY       (SDL_Color){0, 0, 128, 255}
+#define COLOR_LIME       (SDL_Color){0, 255, 0, 255}
+#define COLOR_TEAL       (SDL_Color){0, 128, 128, 255}
+#define COLOR_MAROON     (SDL_Color){128, 0, 0, 255}
+#define COLOR_OLIVE      (SDL_Color){128, 128, 0, 255}
 
 
 bool running;
+int lastx = 0;
+int lasty = 0;
+
+int x1 = 100;
+int y1 = 100;
+int x2 = 200;
+int y2 = 200;
+int x3 = 600;
+int y3 = 100;
 
 typedef struct Entity{
     SDL_Texture *texture;
@@ -45,12 +54,7 @@ void renderPixel(SDL_Renderer *renderer, int* pixels,SDL_Color color)
     {
         if(pixels[x] == 1)
         {
-            for (int i = 0; i < 5; i++)
-            {
-                /* code */
-                SDL_RenderDrawPoint(renderer, x%SCREEN_WIDTH,x/SCREEN_WIDTH+i);
-            }
-            
+            SDL_RenderDrawPoint(renderer, x%SCREEN_WIDTH,x/SCREEN_WIDTH);
         }
     }
     
@@ -89,11 +93,9 @@ void pollWindow(SDL_Event *event)
     case SDL_MOUSEBUTTONDOWN:
         if (event->button.button == SDL_BUTTON_LEFT)
         {
-            printf("Left mouse button pressed at (%d, %d)\n", event->button.x, event->button.y);
         }
         if (event->button.button == SDL_BUTTON_RIGHT)
         {
-            printf("Right mouse button pressed at (%d, %d)\n", event->button.x, event->button.y);
         }
         break;
 
@@ -109,8 +111,8 @@ void destroy(SDL_Window *window, SDL_Renderer *renderer){
     SDL_Quit();
 }
 
-void clearScreen(SDL_Renderer *renderer){
-    SDL_SetRenderDrawColor(renderer, 0, 100, 0, 255);
+void clearScreen(SDL_Renderer *renderer , SDL_Color color){
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
     SDL_RenderClear(renderer);
 }
 
@@ -149,7 +151,6 @@ void pollRect(SDL_Rect *rect, SDL_Event *event)
                 rect->x -= 10;
                 break;
         case SDLK_SPACE:
-                printf("Space key pressed\n");
                 break;
         }
         break;
@@ -158,12 +159,13 @@ void pollRect(SDL_Rect *rect, SDL_Event *event)
     case SDL_MOUSEBUTTONDOWN:
         if (event->button.button == SDL_BUTTON_LEFT)
         {
-                rect->x = event->button.x;
-                rect->y = event->button.y;
+            x3 = event->button.x;
+            y3 = event->button.y;
         }
         if (event->button.button == SDL_BUTTON_RIGHT)
         {
-                printf("Right mouse button pressed at (%d, %d)\n", event->button.x, event->button.y);
+            x2 = event->button.x;
+            y2 = event->button.y;
         }
         break;
 
@@ -235,10 +237,68 @@ void draw_filled_circle(SDL_Renderer* renderer, int centerX, int centerY, int ra
     }
 }
 
-void pollDraw(int *pixels, SDL_Event *event)
+void renderLine(SDL_Renderer *renderer, int x1, int y1, int x2, int y2, SDL_Color color)
 {
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
+    SDL_RenderDrawLine(renderer, x1+1, y1, x2+1, y2);
+    SDL_RenderDrawLine(renderer, x1-1, y1, x2-1, y2);
+    SDL_RenderDrawLine(renderer, x1, y1+1, x2, y2+1);
+    SDL_RenderDrawLine(renderer, x1, y1-1, x2, y2-1);
+}
+
+void renderBezier(SDL_Renderer *renderer, int x1, int y1, int x2, int y2, int x3, int y3, SDL_Color color)
+{
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    float t = 0.0;
+    int x = x1;
+    int y = y1;
+    int x_old = x1;
+    int y_old = y1;
+    for (t = 0.0; t < 1.0; t += 0.01)
+    {
+        x = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * x2 + t * t * x3;
+        y = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * y2 + t * t * y3;
+        // SDL_RenderDrawPoint(renderer, x, y);
+        renderLine(renderer, x_old, y_old, x, y, color);
+        x_old = x;
+        y_old = y;
+    }
+    DrawCircle(renderer, x1, y1, 10,COLOR_RED);
+    DrawCircle(renderer, x2, y2, 10,COLOR_RED);
+    DrawCircle(renderer, x3, y3, 10,COLOR_RED);
+    SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
+    SDL_RenderDrawLine(renderer, x2, y2, x3, y3);
+}
+
+
+void pollDraw(int *pixels, SDL_Event *event, SDL_Renderer *renderer)
+{
+    static SDL_Color color = COLOR_WHITE;
     switch (event->type)
     {
+        case SDL_KEYDOWN:
+            if (event->key.keysym.sym == SDLK_r)
+            {
+                color = COLOR_RED;
+            }
+            else if (event->key.keysym.sym == SDLK_g)
+            {
+                color = COLOR_GREEN;
+            }
+            else if (event->key.keysym.sym == SDLK_b)
+            {
+                color = COLOR_BLUE;
+            }
+            else if (event->key.keysym.sym == SDLK_w)
+            {
+                color = COLOR_WHITE;
+            }
+            else if (event->key.keysym.sym == SDLK_c)
+            {
+                clearScreen(renderer,COLOR_PURPLE);
+            }
+            break;
         /* Mouse Clicks */
         case SDL_MOUSEBUTTONDOWN:
             if (event->button.button == SDL_BUTTON_LEFT)
@@ -249,13 +309,22 @@ void pollDraw(int *pixels, SDL_Event *event)
             }
             break;
         case SDL_MOUSEMOTION:
-            printf("(%d,%d)\n",event->motion.x,event->motion.y);
-            int mouseX = event->motion.x;
-            int mouseY = event->motion.y;
-            pixels[mouseY*SCREEN_WIDTH+mouseX] = 1;
+            if(event->motion.state & SDL_BUTTON_LMASK)
+            {
+                int mouseX = event->motion.x % SCREEN_WIDTH;
+                int mouseY = event->motion.y % SCREEN_HEIGHT;
+                renderLine(renderer,lastx,lasty,mouseX,mouseY,color);
+                lastx = mouseX;
+                lasty = mouseY;
+                pixels[mouseY*SCREEN_WIDTH+mouseX] = 1;
+            }else{
+                lastx = event->motion.x;
+                lasty = event->motion.y;
+            }
             break;
     }
 }
+
 
 void pollEvents(SDL_Window *window, SDL_Rect *rect, int *pixels)
 {
@@ -263,7 +332,7 @@ void pollEvents(SDL_Window *window, SDL_Rect *rect, int *pixels)
     while(SDL_PollEvent(&event)){
         pollRect(rect,&event);
         pollWindow(&event);
-        pollDraw(pixels,&event);
+        pollDraw(pixels,&event,SDL_GetRenderer(window));
     }
 }
 
@@ -271,7 +340,7 @@ int main(int argc, char** argv)
 {
     SDL_Init(SDL_INIT_VIDEO);
     IMG_Init(IMG_INIT_PNG);
-    SDL_Window *window = SDL_CreateWindow("SLD test",
+    SDL_Window *window = SDL_CreateWindow("SDL test",
                                           SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED,
                                           SCREEN_WIDTH, SCREEN_HEIGHT,
@@ -292,19 +361,18 @@ int main(int argc, char** argv)
     memset(pixels, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(int));
     /// render multiple points at once
 
-
-
     running = true;
-
+    clearScreen(renderer,COLOR_PURPLE);
     // /* Game Loop */
     while(running){
         pollEvents(window,&rec1,pixels);
-        clearScreen(renderer);
+        // clearScreen(renderer,COLOR_PURPLE);
         renderEntity(&entity1, renderer);
         renderRect(renderer, COLOR_TEAL, &rec1);
-        DrawCircle(renderer, SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 200,COLOR_RED);
+        DrawCircle(renderer, SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 200,COLOR_OLIVE);
         draw_filled_circle(renderer, 400, 300, 100);
-        renderPixel(renderer,pixels,COLOR_BLACK);
+        // renderPixel(renderer,pixels,COLOR_MAGENTA);
+        renderBezier(renderer, x1, y1, x2, y2, x3, y3, COLOR_WHITE);
         SDL_RenderPresent(renderer);
     }
     destroy(window, renderer);
