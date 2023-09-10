@@ -10,10 +10,10 @@ LIBS=$(foreach DIR,$(LIB_DIRS),-L$(DIR))
 LIBS+=-lopengl32 -lglfw3 -lglew32 -lgdi32
 CFLAGS=$(DBG) $(OPT) $(INCS) $(LIBS) $(WARNINGS) $(DEPFLAGS)
 
-INC_DIRS=./GLFW/include/GL/ ./GLFW/include/GLFW/ ./Imgui/include/
+INC_DIRS=./GLFW/include/GL/ ./GLFW/include/GLFW/ ./Imgui/include/ ./include/
 LIB_DIRS=./GLFW/lib/
 BUILD_DIR=build
-CODE_DIRS=. Imgui/src
+CODE_DIRS=. Imgui/src src
 VPATH=$(CODE_DIRS)
 
 SRC=$(foreach DIR,$(CODE_DIRS),$(wildcard $(DIR)/*.cpp))
@@ -36,6 +36,7 @@ $(BUILD_DIR)/$(EXEC): $(OBJ)
 
 $(BUILD_DIR):
 	mkdir $@
+	cp ./GLFW/lib/*.dll ./build/
 	$(info SRC_DIRS : $(CODE_DIRS))
 	$(info INC_DIRS : $(INC_DIRS))
 	$(info INCS     : $(INCS))
